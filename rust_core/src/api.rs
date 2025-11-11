@@ -33,6 +33,7 @@ impl ApiHandle {
         Ok(Self { runtime, api })
     }
 
+    #[allow(dead_code)]
     fn block_on<F, T>(&self, future: F) -> Result<T, AppError>
     where
         F: Future<Output = Result<T, anyhow::Error>>,
@@ -103,7 +104,7 @@ fn write_error(err_out: *mut FfiError, error: AppError) {
 }
 
 /// Create a new API handle. Returns a null pointer on failure and populates `err_out`.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sparkwms_api_new(
     connect_string: *const c_char,
     err_out: *mut FfiError,
@@ -124,7 +125,7 @@ pub extern "C" fn sparkwms_api_new(
 }
 
 /// Release a handle that was previously created via [`sparkwms_api_new`].
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sparkwms_api_free(handle: *mut ApiHandle) {
     if handle.is_null() {
         return;
@@ -162,7 +163,7 @@ where
 }
 
 /// Send a commit immediately without touching the queue.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sparkwms_api_send_commit(
     handle: *mut ApiHandle,
     commit: FfiCommit,
@@ -176,7 +177,7 @@ pub extern "C" fn sparkwms_api_send_commit(
 }
 
 /// Export the overview view to a CSV file at `path`.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sparkwms_api_export_overview(
     handle: *mut ApiHandle,
     path: *const c_char,
@@ -190,7 +191,7 @@ pub extern "C" fn sparkwms_api_export_overview(
 }
 
 /// Export the locations view to a CSV file at `path`.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sparkwms_api_export_locations(
     handle: *mut ApiHandle,
     path: *const c_char,
@@ -204,7 +205,7 @@ pub extern "C" fn sparkwms_api_export_locations(
 }
 
 /// Export the items table to a CSV file at `path`.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sparkwms_api_export_items(
     handle: *mut ApiHandle,
     path: *const c_char,
@@ -218,7 +219,7 @@ pub extern "C" fn sparkwms_api_export_items(
 }
 
 /// Check if the API is reachable. Returns `true` if the check query succeeded.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sparkwms_api_check(handle: *mut ApiHandle, err_out: *mut FfiError) -> bool {
     with_handle(handle, err_out, |api| {
         let result = api.runtime.block_on(api.api.check());
@@ -227,7 +228,7 @@ pub extern "C" fn sparkwms_api_check(handle: *mut ApiHandle, err_out: *mut FfiEr
 }
 
 /// Add a commit to the on-disk queue.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sparkwms_queue_enqueue(
     path: *const c_char,
     commit: FfiCommit,
@@ -251,7 +252,7 @@ pub extern "C" fn sparkwms_queue_enqueue(
 }
 
 /// Return the number of commits currently persisted in the queue file.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sparkwms_queue_len(path: *const c_char, err_out: *mut FfiError) -> i32 {
     match (|| -> Result<usize, AppError> {
         let path = path_from_ptr(path)?;
@@ -270,7 +271,7 @@ pub extern "C" fn sparkwms_queue_len(path: *const c_char, err_out: *mut FfiError
 
 /// Start the commit manager loop on a background thread. Returns `false` if the thread
 /// could not be spawned or the inputs were invalid.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sparkwms_start_commit_manager(
     connect_string: *const c_char,
     queue_path: *const c_char,
@@ -318,7 +319,7 @@ pub extern "C" fn sparkwms_start_commit_manager(
 }
 
 /// Convenience helper for Dart/Flutter to dispose FFI owned strings.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sparkwms_string_from_rust(value: *const c_char) -> *mut c_char {
     if value.is_null() {
         return ptr::null_mut();

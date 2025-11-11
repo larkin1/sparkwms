@@ -103,7 +103,7 @@ impl From<AppError> for FfiError {
 }
 
 /// Release a C string that originated from this library.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn sparkwms_string_free(ptr: *mut c_char) {
     if ptr.is_null() {
         return;
