@@ -12,13 +12,13 @@ A python mockup can be found [here](https://github.com/larkin1/SparkWMS)
  - [ ] Package and run proof of concept on android
  - [ ] flesh out and ship
 #### Core
- - [ ] Interface with server
-   - [ ] Upload Commits
-   - [ ] Verify Connection
-   - [ ] Download Table
- - [ ] Ensure Each Commit is sent once
- - [ ] Wifi failsafe
+ - [x] Interface with server
+   - [x] Upload Commits
+   - [x] Verify Connection
+   - [x] Download Table
+ - [x] Ensure Each Commit is sent once
+ - [x] Wifi failsafe
 #### Serverside
- - [ ] Set up on supabase for now
- - [ ] make tables and link em together
- - [ ] move to self hosted/other alternatives to supabase (preferably cheaper than $25/month)
+ - [x] Set up on supabase for now
+ - [x] make tables and link em together
+ - [x] move to self hosted/other alternatives to supabase (preferably cheaper than $25/month)
