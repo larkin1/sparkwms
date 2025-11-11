@@ -1,5 +1,10 @@
 //! Queue functions and main queue uploading loop.
-use std::{collections::VecDeque, fs, io, path::Path, time::Duration};
+use std::{
+    collections::VecDeque,
+    fs, io,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use serde::{Deserialize, Serialize};
 use tokio::time::sleep;
@@ -62,11 +67,23 @@ impl Queue {
 }
 
 #[allow(dead_code)]
-pub async fn commit_manager(api: NeonAPI) -> io::Result<()> {
+pub fn enqueue_commit(path: impl AsRef<Path>, commit: Commit) -> io::Result<()> {
+    let path = path.as_ref();
+    let mut queue = Queue::load(path)?;
+    queue.enqueue(commit, path)
+}
+
+#[allow(dead_code)]
+pub fn queue_len(path: impl AsRef<Path>) -> io::Result<usize> {
+    Ok(Queue::load(path)?.items.len())
+}
+
+#[allow(dead_code)]
+pub async fn commit_manager(api: NeonAPI, path: impl AsRef<Path>) -> io::Result<()> {
     //! Background Loop to monitor queue and send new commits at all times.
     //! Should be run in a thread separate from the GUI (obv lol).
-    let path = "commit_queue.json";
-    let mut queue = Queue::load(path)?;
+    let path_buf: PathBuf = path.as_ref().to_path_buf();
+    let mut queue = Queue::load(&path_buf)?;
 
     loop {
         if queue.items.len() > 0 {
@@ -91,7 +108,7 @@ pub async fn commit_manager(api: NeonAPI) -> io::Result<()> {
                 continue;
             }
 
-            queue.pop_front(Path::new(path))?;
+            queue.pop_front(&path_buf)?;
         }
     }
 }

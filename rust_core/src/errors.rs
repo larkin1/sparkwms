@@ -1,77 +1,139 @@
-//! IDFK what this is lol chatGPT wrote it and it does literally nothing. 0/10
+//! Error helpers shared by the FFI and the internal logic layers.
 
-// errors.rs
+use std::ffi::CString;
+use std::io;
+use std::os::raw::c_char;
+
 use thiserror::Error;
 
+/// High level error type used across the Rust core.
 #[derive(Debug, Error)]
 pub enum AppError {
-    // client-side / input
+    /// Invalid input provided by the caller.
     #[error("validation failed: {0}")]
     Validation(String),
 
-    // talking to your server
+    /// Failure when communicating with the remote API.
     #[error("network error: {0}")]
     Network(String),
 
-    // server said “no” (4xx/5xx)
+    /// The server explicitly returned an error.
     #[error("server error: {status} {message}")]
-    Server {
-        status: u16,
-        message: String,
-    },
+    Server { status: u16, message: String },
 
-    // auth/session
+    /// Authentication or authorization failed.
     #[error("unauthorized")]
     Unauthorized,
 
-    // (de)serializing JSON from server
+    /// Serialization or deserialization failed.
     #[error("serialization error: {0}")]
     Serialization(String),
 
-    // catch-all
-    #[error("internal error")]
-    Internal,
+    /// Any other unclassified error.
+    #[error("internal error: {0}")]
+    Internal(String),
 }
 
-impl From<reqwest::Error> for AppError {
-    fn from(e: reqwest::Error) -> Self {
-        if let Some(status) = e.status() {
-            AppError::Server {
-                status: status.as_u16(),
-                message: e.to_string(),
-            }
-        } else {
-            AppError::Network(e.to_string())
-        }
+impl From<anyhow::Error> for AppError {
+    fn from(value: anyhow::Error) -> Self {
+        AppError::Internal(value.to_string())
     }
 }
 
 impl From<serde_json::Error> for AppError {
-    fn from(e: serde_json::Error) -> Self {
-        AppError::Serialization(e.to_string())
+    fn from(value: serde_json::Error) -> Self {
+        AppError::Serialization(value.to_string())
     }
 }
 
-pub struct FfiError {
-    pub code: i32,
-    pub message: String,
+impl From<csv::Error> for AppError {
+    fn from(value: csv::Error) -> Self {
+        AppError::Internal(value.to_string())
+    }
 }
 
-impl From<AppError> for FfiError {
-    fn from(e: AppError) -> Self {
-        match e {
-            AppError::Validation(msg) =>
-                FfiError { code: 1, message: msg },
-            AppError::Network(msg) =>
-                FfiError { code: 2, message: msg },
-            AppError::Server { status, message } =>
-                FfiError { code: 3, message: format!("{status} {message}") },
-            AppError::Unauthorized =>
-                FfiError { code: 4, message: "unauthorized".into() },
-            AppError::Serialization(msg) =>
-                FfiError { code: 5, message: msg },
-            AppError::Internal =>
-                FfiError { code: 999, message: "internal".into() },
+impl From<io::Error> for AppError {
+    fn from(value: io::Error) -> Self {
+        AppError::Internal(value.to_string())
+    }
+}
+
+/// A small error container that is safe to transfer across the C FFI boundary.
+#[repr(C)]
+#[derive(Debug)]
+pub struct FfiError {
+    /// Application specific error code. `0` represents success.
+    pub code: i32,
+    /// Heap allocated, null terminated UTF-8 message. The caller is responsible for
+    /// releasing it via [`sparkwms_string_free`].
+    pub message: *mut c_char,
+}
+
+impl FfiError {
+    /// Helper returned when an operation succeeds.
+    pub fn success() -> Self {
+        Self {
+            code: 0,
+            message: std::ptr::null_mut(),
+        }
+    }
+
+    fn from_message(code: i32, message: String) -> Self {
+        let cstring = CString::new(message).unwrap_or_else(|_| CString::new("invalid error").unwrap());
+        Self {
+            code,
+            message: cstring.into_raw(),
         }
     }
 }
+
+impl From<AppError> for FfiError {
+    fn from(value: AppError) -> Self {
+        match value {
+            AppError::Validation(msg) => Self::from_message(1, msg),
+            AppError::Network(msg) => Self::from_message(2, msg),
+            AppError::Server { status, message } => {
+                Self::from_message(3, format!("{status} {message}"))
+            }
+            AppError::Unauthorized => Self::from_message(4, "unauthorized".into()),
+            AppError::Serialization(msg) => Self::from_message(5, msg),
+            AppError::Internal(msg) => Self::from_message(999, msg),
+        }
+    }
+}
+
+/// Release a C string that originated from this library.
+#[no_mangle]
+pub extern "C" fn sparkwms_string_free(ptr: *mut c_char) {
+    if ptr.is_null() {
+        return;
+    }
+
+    unsafe {
+        drop(CString::from_raw(ptr));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ffi_error_success_has_null_message() {
+        let err = FfiError::success();
+        assert_eq!(err.code, 0);
+        assert!(err.message.is_null());
+    }
+
+    #[test]
+    fn converts_internal_error() {
+        let error = AppError::Internal("boom".into());
+        let ffi: FfiError = error.into();
+        assert_eq!(ffi.code, 999);
+        unsafe {
+            assert_eq!(std::ffi::CStr::from_ptr(ffi.message).to_str().unwrap(), "boom");
+        }
+        sparkwms_string_free(ffi.message);
+    }
+}
+
