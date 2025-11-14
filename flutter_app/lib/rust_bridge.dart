@@ -253,9 +253,9 @@ void _handleError(ffi.Pointer<FfiError> errPtr, String context) {
   throw RustApiException(code, '$context failed: $message');
 }
 
-final class ApiHandle extends ffi.Opaque {}
+class ApiHandle extends ffi.Opaque {}
 
-final class FfiCommit extends ffi.Struct {
+class FfiCommit extends ffi.Struct {
   external ffi.Pointer<ffi.Char> deviceId;
   external ffi.Pointer<ffi.Char> location;
 
@@ -266,7 +266,7 @@ final class FfiCommit extends ffi.Struct {
   external int itemId;
 }
 
-final class FfiError extends ffi.Struct {
+class FfiError extends ffi.Struct {
   @ffi.Int32()
   external int code;
 
