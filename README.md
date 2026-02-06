@@ -1,3 +1,4 @@
+### THIS IS ABANDONED AND UNFINISHED - I SWITCHED TO GO HALFWAY BECASUE RUST IS TOO HARD FOR A SMOOTHBRAIN LIKE MYSELF
 # SparkWMS
 Mobile app to manage warehouse tracking written in flutter using rust behind the scenes.
 This project is a WIP currently.
